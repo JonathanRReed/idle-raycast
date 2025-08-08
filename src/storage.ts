@@ -34,7 +34,8 @@ export async function loadGameState(): Promise<GameState> {
       settings,
       // Important: Do NOT accrue offline progress here; handled centrally in useGameState
       currency: savedState.currency || 0,
-      lastUpdate: now,
+      // Preserve saved lastUpdate so useGameState can compute offline progress
+      lastUpdate: (savedState as Partial<GameState>).lastUpdate || now,
     };
   } catch (error) {
     console.error("Error loading game state:", error);
@@ -44,7 +45,26 @@ export async function loadGameState(): Promise<GameState> {
 
 export async function saveGameState(state: GameState): Promise<void> {
   try {
-    const stateToSave = { ...state, lastUpdate: Date.now() };
+    // Avoid clobbering newer data in dev reloads or unmounts: compare timestamps
+    const existing = await LocalStorage.getItem(GAME_STATE_KEY);
+    let existingTs = 0;
+    if (typeof existing === "string") {
+      try {
+        const parsed = JSON.parse(existing) as Partial<GameState> & { lastUpdate?: number };
+        existingTs = typeof parsed.lastUpdate === "number" ? parsed.lastUpdate : 0;
+      } catch {
+        existingTs = 0;
+      }
+    }
+
+    const incomingBase = typeof state.lastUpdate === "number" ? state.lastUpdate : 0;
+    const incomingTs = Math.max(incomingBase, Date.now());
+    if (existingTs > incomingTs) {
+      // Existing data is newer; skip save to prevent stale overwrite
+      return;
+    }
+
+    const stateToSave = { ...state, lastUpdate: incomingTs };
     await LocalStorage.setItem(GAME_STATE_KEY, JSON.stringify(stateToSave));
   } catch (error) {
     console.error("Error saving game state:", error);

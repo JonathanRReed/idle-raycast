@@ -7,7 +7,7 @@
 - Add auto-clicker effect to idle rate
 - Improve upgrade accessories: accurate effect labels (cost %, lucky chance, auto cps, multipliers)
 - Milestone bonus now uses highest achieved milestone
-- Remove Buy 10 feature and `bulkPurchase` upgrade; simplify UI
+- Remove Buy 10 feature and `bulkPurchase` upgrade; simplify UI & causing bugs
 - Prestige points accrue faster: `floor(sqrt(totalEarned / 800_000))`
 - Truncate design doc overview; expand README with Store checklist
 - Add categories to `package.json` and refine description
@@ -17,3 +17,8 @@
 - Idle clicker core gameplay
 - Active / Idle / Efficiency upgrades
 - Prestige system and UI
+
+## [Polish: Menu Bar] - {2025-08-08}
+
+- Menu bar idle accrual
+- Menu bar UI

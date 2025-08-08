@@ -1,4 +1,4 @@
-import { Action, ActionPanel, Color, Icon, List, confirmAlert, Alert } from "@raycast/api";
+import { Action, ActionPanel, Color, Icon, List, confirmAlert, Alert, launchCommand, LaunchType } from "@raycast/api";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { formatNumber } from "./utils";
 import { UPGRADES, type GameState, UPGRADE_CATEGORIES, calculateUpgradeCost, calculateUpgradeEffect } from "./types";
@@ -198,9 +198,7 @@ export function GameView({
               source: isClicking ? Icon.StarCircle : Icon.Star,
               tintColor: isClicking ? Color.Yellow : undefined,
             }}
-            accessories={[
-              { text: "⌘C", icon: Icon.Keyboard, tooltip: "Click to Earn" },
-            ]}
+            accessories={[{ text: "⌘C", icon: Icon.Keyboard, tooltip: "Click to Earn" }]}
             actions={
               <ActionPanel>
                 <Action title="Click to Earn" onAction={handleClick} shortcut={{ modifiers: ["cmd"], key: "c" }} />
@@ -221,6 +219,11 @@ export function GameView({
                   onAction={onToggleLuckyToasts}
                   icon={Icon.Bell}
                   shortcut={{ modifiers: ["cmd"], key: "t" }}
+                />
+                <Action
+                  title="Enable Background (Menu Bar)"
+                  icon={Icon.AppWindow}
+                  onAction={() => launchCommand({ name: "menu-bar", type: LaunchType.UserInitiated })}
                 />
               </ActionPanel>
             }
@@ -271,11 +274,7 @@ export function GameView({
             .map((upgrade) => {
               const level = safeGameState.upgrades[upgrade.id] || 0;
               const cost = calculateUpgradeCost(upgrade, level);
-              const effect = calculateUpgradeEffect(
-                upgrade,
-                level,
-                safeGameState.milestoneBonuses[upgrade.id] || 1,
-              );
+              const effect = calculateUpgradeEffect(upgrade, level, safeGameState.milestoneBonuses[upgrade.id] || 1);
               // Use the last milestone level as the max level, or Infinity if no milestones
               const maxLevel =
                 upgrade.milestoneLevels?.length > 0 ? Math.max(...upgrade.milestoneLevels) * 2 : Infinity;
@@ -283,8 +282,7 @@ export function GameView({
               const canAfford = safeGameState.currency >= cost;
               // Buy Max visibility: only when unlocked via prestige (Bulk Buyer Pro) or setting
               const hasBuyMax = Boolean(
-                safeGameState.settings?.bulkBuyEnabled ||
-                  (safeGameState.prestige?.upgrades?.["bulkBuyerPro"] || 0) > 0,
+                safeGameState.settings?.bulkBuyEnabled || (safeGameState.prestige?.upgrades?.["bulkBuyerPro"] || 0) > 0,
               );
 
               // Estimate Buy Max count (greedy)
@@ -384,7 +382,12 @@ export function GameView({
                       />
                       <Action title="Show Stats" onAction={onShowStats} icon={Icon.BarChart} />
                       <Action title="Prestige Upgrades" onAction={onShowPrestigeUpgrades} icon={Icon.Stars} />
-                      <Action title="Reset Game" onAction={onReset} style={Action.Style.Destructive} icon={Icon.Trash} />
+                      <Action
+                        title="Reset Game"
+                        onAction={onReset}
+                        style={Action.Style.Destructive}
+                        icon={Icon.Trash}
+                      />
                     </ActionPanel>
                   }
                 />

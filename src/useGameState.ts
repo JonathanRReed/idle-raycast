@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
-import { showToast, Toast } from "@raycast/api";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { showToast, Toast, LocalStorage } from "@raycast/api";
 import {
   GameState,
   INITIAL_STATE,
@@ -10,6 +10,9 @@ import {
 } from "./types";
 import { loadGameState, saveGameState, resetGameState } from "./storage";
 import { PRESTIGE_UPGRADES, calculatePrestigeUpgradeCost, calculatePrestigeUpgradeEffect } from "./prestigeUpgrades";
+
+// Only trigger UI updates when the gain exceeds this epsilon to avoid noisy re-renders
+const MIN_GAIN_EPS = 0.01;
 
 interface UseGameStateReturn {
   gameState: GameState & { idleRate: number };
@@ -28,7 +31,8 @@ export function useGameState(): UseGameStateReturn {
   const [gameState, setGameState] = useState<GameState>(INITIAL_STATE);
   const [isLoading, setIsLoading] = useState(true);
   const [lastClickTime, setLastClickTime] = useState<number>(0);
-  const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
+  const lastUpdateRef = useRef<number>(Date.now());
+  const latestStateRef = useRef<GameState>(INITIAL_STATE);
 
   // Calculate derived game state values
   const calculateDerivedState = useCallback((state: GameState) => {
@@ -164,47 +168,69 @@ export function useGameState(): UseGameStateReturn {
   }, [calculateDerivedState]);
 
   // Game loop for idle generation
+
   useEffect(() => {
     if (isLoading) return;
 
     const interval = setInterval(() => {
-      const now = Date.now();
-      const deltaTime = (now - lastUpdate) / 1000; // in seconds
+      (async () => {
+        const menuBarActive = await LocalStorage.getItem("idle-menu-bar-active");
+        const now = Date.now();
+        const prev = lastUpdateRef.current;
+        const deltaTime = (now - prev) / 1000; // seconds
 
-      if (deltaTime > 0) {
-        setGameState((prevState) => {
-          const newState = {
-            ...prevState,
-            currency: prevState.currency + prevState.idleRate * deltaTime,
-            prestige: {
-              ...prevState.prestige,
-              totalEarned: prevState.prestige.totalEarned + prevState.idleRate * deltaTime,
-              lifetimeEarned: prevState.prestige.lifetimeEarned + prevState.idleRate * deltaTime,
-            },
-            lastUpdate: now,
-          };
+        // If menu bar is driving idle accrual, do not trigger React renders here
+        if (menuBarActive) {
+          lastUpdateRef.current = now;
+          return;
+        }
 
-          // Auto-save every 30 seconds
-          if (now % 30000 < 100) {
-            saveGameState(newState);
-          }
+        if (deltaTime > 0) {
+          setGameState((prevState) => {
+            const gained = prevState.idleRate * deltaTime;
+            if (gained < MIN_GAIN_EPS) {
+              // No visible changes; avoid creating a new object to prevent re-renders
+              lastUpdateRef.current = now;
+              return prevState;
+            }
+            const newState = {
+              ...prevState,
+              currency: prevState.currency + gained,
+              prestige: {
+                ...prevState.prestige,
+                totalEarned: prevState.prestige.totalEarned + gained,
+                lifetimeEarned: prevState.prestige.lifetimeEarned + gained,
+              },
+              lastUpdate: now,
+            };
+            // Auto-save every ~5s (more reliable persistence)
+            if (now - prev >= 5000) {
+              saveGameState(newState);
+            }
+            return newState;
+          });
+        }
 
-          return newState;
-        });
-      }
-
-      setLastUpdate(now);
-    }, 1000); // Update every second
+        lastUpdateRef.current = now;
+      })();
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, [isLoading, lastUpdate]);
+  }, [isLoading]);
 
-  // Save game state when it changes
+  // Removed "save on every change" to reduce churn; saving is handled on cadence in the idle loop and critical actions
+
+  // Keep a ref of the latest state for safe save-on-unmount without triggering re-renders
   useEffect(() => {
-    if (!isLoading) {
-      saveGameState(gameState);
-    }
-  }, [gameState, isLoading]);
+    latestStateRef.current = gameState;
+  }, [gameState]);
+
+  // Save once on unmount as a safety net
+  useEffect(() => {
+    return () => {
+      void saveGameState(latestStateRef.current);
+    };
+  }, []);
 
   // Handle click action
   const click = useCallback(() => {
@@ -250,7 +276,10 @@ export function useGameState(): UseGameStateReturn {
       };
 
       // Return the new state with derived values
-      return calculateDerivedState(newState);
+      const derived = calculateDerivedState(newState);
+      // Persist click gains immediately so progress isn't lost
+      void saveGameState(derived);
+      return derived;
     });
 
     setLastClickTime(now);
@@ -325,6 +354,10 @@ export function useGameState(): UseGameStateReturn {
           });
         }
 
+        // Persist immediately so purchases aren't lost if the command closes
+        void saveGameState(newState);
+        // Persist immediately so prestige upgrades aren't lost on close
+        void saveGameState(newState);
         return calculateDerivedState(newState);
       });
 
@@ -395,6 +428,7 @@ export function useGameState(): UseGameStateReturn {
         style: Toast.Style.Success,
         title: `Lucky Toasts ${enabled ? "Enabled" : "Disabled"}`,
       });
+      void saveGameState(next);
       return next;
     });
   }, []);
@@ -415,17 +449,21 @@ export function useGameState(): UseGameStateReturn {
       return;
     }
 
-    setGameState((prev) => ({
-      ...INITIAL_STATE,
-      lastUpdate: Date.now(),
-      prestige: {
-        level: prev.prestige.level + 1,
-        totalEarned: 0,
-        prestigePoints: prev.prestige.prestigePoints + prestigePoints,
-        lifetimeEarned: prev.prestige.lifetimeEarned,
-        upgrades: prev.prestige.upgrades,
-      },
-    }));
+    setGameState((prev) => {
+      const next = {
+        ...INITIAL_STATE,
+        lastUpdate: Date.now(),
+        prestige: {
+          level: prev.prestige.level + 1,
+          totalEarned: 0,
+          prestigePoints: prev.prestige.prestigePoints + prestigePoints,
+          lifetimeEarned: prev.prestige.lifetimeEarned,
+          upgrades: prev.prestige.upgrades,
+        },
+      } as GameState;
+      void saveGameState(next);
+      return next;
+    });
 
     showToast({
       style: Toast.Style.Success,
@@ -508,6 +546,8 @@ export function useGameState(): UseGameStateReturn {
           newState.settings.autoClickEnabled = true;
         }
 
+        // Persist immediately so prestige upgrades and setting toggles aren't lost
+        void saveGameState(newState);
         return calculateDerivedState(newState);
       });
 
@@ -524,7 +564,7 @@ export function useGameState(): UseGameStateReturn {
 
   // Return the game state and actions
   return {
-    gameState: calculateDerivedState(gameState),
+    gameState,
     click,
     purchaseUpgrade,
     purchaseUpgradeMax,

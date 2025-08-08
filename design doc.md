@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-Ray Clicker is a Raycast idle/clicker with fast loops and clear progression.
+Ray Clicker is a simple idle clicker game for Raycast with upgrade, made as a learning exercise for Raycast extensions development.
 
 - **Three Trees:** Active (click power), Idle (currency/sec), Efficiency (global multipliers, QoL).
 - **Scaling:** Exponential upgrade costs; milestone power spikes at key levels.

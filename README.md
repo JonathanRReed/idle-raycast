@@ -1,13 +1,14 @@
 # Ray Clicker
 
-Idle clicker game for Raycast with upgrades, prestige, and fun events.
+A simple idle clicker game for Raycast with upgrade, made as a learning exercise for Raycast extensions development.
 
 ## Features
 
-- Active, Idle, and Efficiency upgrade trees
-- Buy Max, cost reductions, milestones, and auto-clicker
+- Active, Idle, and Efficiency upgrade trees, raycast/productivty themed
+- Buy max, cost reductions, milestones, and auto-clicker
 - Prestige loop with permanent bonuses and UI estimate
-- Golden Command random bonus with optional toasts
+- Golden Command random bonus with optional toast
+
 
 ## Requirements
 
@@ -39,7 +40,7 @@ Idle clicker game for Raycast with upgrades, prestige, and fun events.
 - License: MIT
 - API: using latest @raycast/api via npx for build/lint
 - Categories: `Fun`
-- Icon: `assets/extension-icon.png` (512x512 PNG). Ensure high contrast in light/dark.
+- Icon: `assets/icon.png` (512x512 PNG). Ensure high contrast in light/dark.
 - No external analytics, no keychain usage
 - No opaque binaries; no background downloads
 - Naming follows Apple Style Guide; Title Case actions
@@ -50,7 +51,7 @@ Idle clicker game for Raycast with upgrades, prestige, and fun events.
 ## Screenshots
 
 Use Raycast Window Capture (Preferences → Advanced):
-
+![alt text](assets/screenshot.png)
 - Size: 2000×1250 (16:10), PNG
 - Use a single, high-contrast background
 - Showcase informative views (Upgrades, Stats, Prestige)

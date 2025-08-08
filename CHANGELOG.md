@@ -21,4 +21,8 @@
 ## [Polish: Menu Bar] - {2025-08-08}
 
 - Menu bar idle accrual
+- Menu bar idle rate
 - Menu bar UI
+- fix: menu bar idle rate not updating
+- fix: Not saving to local storage
+

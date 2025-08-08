@@ -262,7 +262,7 @@ export function useGameState(): UseGameStateReturn {
 
       const newCurrency = prev.currency + pointsEarned;
 
-      console.log(`Click value: ${pointsEarned}, New currency: ${newCurrency}`);
+      // Dev log removed for Store readiness
 
       // Create new state object
       const newState = {

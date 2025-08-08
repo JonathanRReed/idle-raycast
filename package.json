@@ -3,7 +3,7 @@
   "name": "ray-clicker",
   "title": "Ray Clicker",
   "description": "Idle clicker game for Raycast with upgrades, prestige, and fun events.",
-  "icon": "assets/extension-icon.png",
+  "icon": "assets/icon.png",
   "author": "JonathanRReed",
   "license": "MIT",
   "categories": ["Fun"],
@@ -13,6 +13,7 @@
       "title": "Ray Clicker",
       "subtitle": "Idle Clicker Game",
       "description": "Play the idle clicker game with upgrades",
+      "icon": "assets/icon.png",
       "mode": "view"
     }
   ],

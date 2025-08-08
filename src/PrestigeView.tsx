@@ -207,7 +207,7 @@ export function PrestigeView({ gameState, onPurchasePrestigeUpgrade, onBack }: P
                               title={"Purchase Upgrade"}
                               onAction={() => handlePurchase(upgrade)}
                               icon={Icon.Star}
-                              shortcut={{ modifiers: ["cmd"], key: "p" }}
+                              shortcut={{ modifiers: ["cmd"], key: "e" }}
                             />
                           )}
                           <Action

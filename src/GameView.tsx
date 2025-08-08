@@ -205,7 +205,7 @@ export function GameView({
                   title="Prestige Upgrades"
                   onAction={onShowPrestigeUpgrades}
                   icon={Icon.Stars}
-                  shortcut={{ modifiers: ["cmd"], key: "p" }}
+                  shortcut={{ modifiers: ["cmd"], key: "e" }}
                 />
                 <Action
                   title="Show Stats"

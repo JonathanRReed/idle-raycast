@@ -198,6 +198,9 @@ export function GameView({
               source: isClicking ? Icon.StarCircle : Icon.Star,
               tintColor: isClicking ? Color.Yellow : undefined,
             }}
+            accessories={[
+              { text: "⌘C", icon: Icon.Keyboard, tooltip: "Click to Earn" },
+            ]}
             actions={
               <ActionPanel>
                 <Action title="Click to Earn" onAction={handleClick} shortcut={{ modifiers: ["cmd"], key: "c" }} />
@@ -268,16 +271,25 @@ export function GameView({
             .map((upgrade) => {
               const level = safeGameState.upgrades[upgrade.id] || 0;
               const cost = calculateUpgradeCost(upgrade, level);
-              const effect = calculateUpgradeEffect(upgrade, level, safeGameState.milestoneBonuses[upgrade.id] || 1);
+              const effect = calculateUpgradeEffect(
+                upgrade,
+                level,
+                safeGameState.milestoneBonuses[upgrade.id] || 1,
+              );
               // Use the last milestone level as the max level, or Infinity if no milestones
               const maxLevel =
                 upgrade.milestoneLevels?.length > 0 ? Math.max(...upgrade.milestoneLevels) * 2 : Infinity;
               const isMaxed = level >= maxLevel;
               const canAfford = safeGameState.currency >= cost;
+              // Buy Max visibility: only when unlocked via prestige (Bulk Buyer Pro) or setting
+              const hasBuyMax = Boolean(
+                safeGameState.settings?.bulkBuyEnabled ||
+                  (safeGameState.prestige?.upgrades?.["bulkBuyerPro"] || 0) > 0,
+              );
 
               // Estimate Buy Max count (greedy)
               let estBuy = 0;
-              if (!isMaxed) {
+              if (!isMaxed && hasBuyMax) {
                 const frugalLevel = safeGameState.prestige.upgrades["frugalShopper"] || 0;
                 let reduction = 1;
                 if (frugalLevel > 0) reduction = Math.max(0.01, 1 - 0.02 * frugalLevel);
@@ -338,28 +350,25 @@ export function GameView({
                         icon: Icon.Gauge,
                       } as const;
                     })(),
-                    ...(estBuy > 0
-                      ? ([
-                          {
-                            text: `Buy Max → ${estBuy}`,
-                            icon: Icon.ArrowDownCircle,
-                          },
-                        ] as const)
+                    // Keyboard hint for Buy
+                    ...(!isMaxed ? ([{ text: "⌘B", icon: Icon.Keyboard, tooltip: "Buy" }] as const) : ([] as const)),
+                    // Optional Buy Max preview
+                    ...(hasBuyMax && estBuy > 0
+                      ? ([{ text: `Buy Max → ${estBuy}`, icon: Icon.ArrowDownCircle }] as const)
                       : ([] as const)),
                   ]}
-                  // Removed split panel detail to use single-pane list
                   actions={
                     <ActionPanel>
                       {!isMaxed && (
                         <Action
-                          title={`Buy ${upgrade.name} (${formatNumber(cost)})`}
+                          title={`Buy ${upgrade.name}`}
                           icon={Icon.Plus}
                           onAction={() => onUpgrade(upgrade.id)}
-                          shortcut={{ modifiers: [], key: "enter" }}
+                          shortcut={{ modifiers: ["cmd"], key: "b" }}
                         />
                       )}
                       {/* Buy 10 removed per request */}
-                      {!isMaxed && (
+                      {hasBuyMax && !isMaxed && (
                         <Action
                           title={`Buy Max${estBuy > 0 ? ` (${estBuy})` : ""}`}
                           icon={Icon.ArrowDownCircle}
@@ -375,12 +384,7 @@ export function GameView({
                       />
                       <Action title="Show Stats" onAction={onShowStats} icon={Icon.BarChart} />
                       <Action title="Prestige Upgrades" onAction={onShowPrestigeUpgrades} icon={Icon.Stars} />
-                      <Action
-                        title="Reset Game"
-                        onAction={onReset}
-                        style={Action.Style.Destructive}
-                        icon={Icon.Trash}
-                      />
+                      <Action title="Reset Game" onAction={onReset} style={Action.Style.Destructive} icon={Icon.Trash} />
                     </ActionPanel>
                   }
                 />

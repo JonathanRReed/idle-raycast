@@ -359,11 +359,13 @@ export function useGameState(): UseGameStateReturn {
   useEffect(() => {
     async function load() {
       try {
+        // Clear legacy menu bar flag to avoid stuck paused states
+        await LocalStorage.removeItem("idle-menu-bar-active");
         const savedState = await loadGameState();
         const now = Date.now();
         const timeDiff = (now - (savedState.lastUpdate || now)) / 1000; // in seconds
 
-        // Calculate offline progress
+        // Calculate offline progress (preserve original 50% balance)
         if (timeDiff > 0) {
           const derivedState = calculateDerivedState(savedState);
           const offlineEarnings = derivedState.idleRate * timeDiff * 0.5; // 50% of idle rate while offline
@@ -375,7 +377,7 @@ export function useGameState(): UseGameStateReturn {
           // Achievements for offline gains
           if (offlineEarnings > 0) {
             savedState.achievements = savedState.achievements || {};
-            // AFK IRL: return after >=12h and claim offline progress
+            // AFK IRL: return after ≥12h and claim offline progress
             if (timeDiff >= 43200 && !savedState.achievements["afkIrl"]) {
               savedState.achievements["afkIrl"] = { unlocked: true, unlockedAt: Date.now() };
               showToast({
@@ -399,6 +401,8 @@ export function useGameState(): UseGameStateReturn {
 
         savedState.lastUpdate = now;
         setGameState(calculateDerivedState(savedState));
+        // Align the tick ref with the new baseline to avoid a large first post-load delta
+        lastUpdateRef.current = now;
       } catch (error) {
         console.error("Failed to load game state:", error);
         setGameState(calculateDerivedState(INITIAL_STATE));
@@ -419,37 +423,20 @@ export function useGameState(): UseGameStateReturn {
 
     const interval = setInterval(() => {
       (async () => {
-        const menuBarActive = await LocalStorage.getItem("idle-menu-bar-active");
         const now = Date.now();
         const prev = lastUpdateRef.current;
         const deltaTime = (now - prev) / 1000; // seconds
 
-        // If the menu bar is accruing, sync from storage so UI reflects gains and skip local accrual
-        if (menuBarActive) {
-          try {
-            const stored = await loadGameState();
-            setGameState((prevState) => {
-              const incomingTs = typeof stored.lastUpdate === "number" ? stored.lastUpdate : 0;
-              const prevTs = typeof prevState.lastUpdate === "number" ? prevState.lastUpdate : 0;
-              if (incomingTs > prevTs) {
-                return calculateDerivedState(stored);
-              }
-              return prevState;
-            });
-          } finally {
-            lastUpdateRef.current = now;
-          }
-          return;
-        }
-
         if (deltaTime > 0) {
+          // Fast-path: if expected gain is below epsilon, skip scheduling a state update entirely
+          const gainedEstimate = latestStateRef.current.idleRate * deltaTime;
+          if (gainedEstimate < MIN_GAIN_EPS) {
+            lastUpdateRef.current = now;
+            return;
+          }
+
           setGameState((prevState) => {
             const gained = prevState.idleRate * deltaTime;
-            if (gained < MIN_GAIN_EPS) {
-              // No visible changes; avoid creating a new object to prevent re-renders
-              lastUpdateRef.current = now;
-              return prevState;
-            }
             const newState = {
               ...prevState,
               currency: prevState.currency + gained,
@@ -475,19 +462,41 @@ export function useGameState(): UseGameStateReturn {
     return () => clearInterval(interval);
   }, [isLoading]);
 
-  // Removed "save on every change" to reduce churn; saving is handled on cadence in the idle loop and critical actions
+  // Debounced save on every change for reliability (prevents losing progress on quick exits)
+  useEffect(() => {
+    if (isLoading) return; // don't save until after load completes
+    const t = setTimeout(() => {
+      void saveGameState(gameState);
+    }, 150);
+    return () => {
+      clearTimeout(t);
+      // Flush latest changes synchronously on cleanup to avoid losing progress on quick exits
+      void saveGameState(gameState);
+    };
+  }, [gameState, isLoading]);
 
   // Keep a ref of the latest state for safe save-on-unmount without triggering re-renders
   useEffect(() => {
     latestStateRef.current = gameState;
   }, [gameState]);
 
-  // Save once on unmount as a safety net
+  // Save once on unmount as a safety net (only after initial load completes)
   useEffect(() => {
     return () => {
-      void saveGameState(latestStateRef.current);
+      if (!isLoading) {
+        void saveGameState(latestStateRef.current);
+      }
     };
-  }, []);
+  }, [isLoading]);
+
+  // Lightweight periodic autosave (does not trigger re-render)
+  useEffect(() => {
+    if (isLoading) return; // start autosave only after initial load
+    const autosave = setInterval(() => {
+      void saveGameState(latestStateRef.current);
+    }, 2000);
+    return () => clearInterval(autosave);
+  }, [isLoading]);
 
   // Handle click action
   const click = useCallback(

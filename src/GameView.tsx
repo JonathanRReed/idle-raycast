@@ -1,4 +1,16 @@
-import { Action, ActionPanel, Color, Icon, List, confirmAlert, Alert } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Color,
+  Icon,
+  List,
+  confirmAlert,
+  Alert,
+  launchCommand,
+  LaunchType,
+  showToast,
+  Toast,
+} from "@raycast/api";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { formatNumber } from "./utils";
 import { UPGRADES, type GameState, UPGRADE_CATEGORIES, calculateUpgradeCost, calculateUpgradeEffect } from "./types";
@@ -200,7 +212,21 @@ export function GameView({
                   icon={Icon.Bell}
                   shortcut={{ modifiers: ["cmd"], key: "t" }}
                 />
-                {/* Menu Bar command removed; background accrual replaced by offline catch-up */}
+                <Action
+                  title="Enable Background (Menu Bar)"
+                  icon={Icon.AppWindow}
+                  onAction={async () => {
+                    try {
+                      await launchCommand({ name: "menu-bar", type: LaunchType.UserInitiated });
+                    } catch (e) {
+                      await showToast({
+                        style: Toast.Style.Failure,
+                        title: "Failed to open Menu Bar",
+                        message: e instanceof Error ? e.message : String(e),
+                      });
+                    }
+                  }}
+                />
                 {/* Category actions moved below Click to Earn; removed Cycle Category (reserved shortcut) */}
               </ActionPanel>
             }

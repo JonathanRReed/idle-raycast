@@ -90,3 +90,8 @@
 - Fix title casing for Menu Bar command in `package.json`.
 - Format changelog entries to ISO dates and correct typos throughout.
 - Add category switcher to upgrade action menu
+
+## [Windows ready & package update] - PR_MERGE_DATE
+
+- verified Windows support
+- updated package.json

@@ -1,17 +1,26 @@
-import { Action, ActionPanel, Color, Icon, List, confirmAlert, Alert } from "@raycast/api";
+import {
+  Action,
+  ActionPanel,
+  Color,
+  Icon,
+  List,
+  confirmAlert,
+  Alert,
+  launchCommand,
+  LaunchType,
+  showToast,
+  Toast,
+} from "@raycast/api";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { formatNumber } from "./utils";
 import { UPGRADES, type GameState, UPGRADE_CATEGORIES, calculateUpgradeCost, calculateUpgradeEffect } from "./types";
 import { useClickEffect } from "./effects/ClickEffect";
-import { ComboCounter } from "./effects/ComboCounter";
-import { getMilestoneMessage } from "./utils/visuals";
 
 // Removed ClickPosition type as we're no longer using position-based effects
 
 type GameViewProps = {
   gameState: GameState & { idleRate: number };
   comboMultiplier: number;
-  comboCount: number;
   onUpgrade: (id: string) => void;
   onUpgradeMax: (id: string) => void;
   onEarn: () => void;
@@ -48,21 +57,19 @@ const defaultGameState: GameState = {
 };
 
 export function GameView({
-  gameState = defaultGameState,
-  comboMultiplier = 1,
-  comboCount = 0,
-  onUpgrade = () => {},
-  onUpgradeMax = () => {},
-  onEarn = () => {},
-  onReset = () => {},
-  onShowStats = () => {},
-  onShowPrestigeUpgrades = () => {
-    /* This will be overridden by the actual implementation in index.tsx */
-  },
-  onSearchTextChange = () => {},
-  isLoading = false,
-  onToggleLuckyToasts = () => {},
-}: Partial<GameViewProps> = {}) {
+  gameState,
+  comboMultiplier,
+  onUpgrade,
+  onUpgradeMax,
+  onEarn,
+  onReset,
+  onPrestige,
+  onShowStats,
+  onShowPrestigeUpgrades,
+  onSearchTextChange,
+  isLoading,
+  onToggleLuckyToasts,
+}: GameViewProps) {
   // Ensure we have a valid game state
   const safeGameState = useMemo(
     () => ({
@@ -80,9 +87,6 @@ export function GameView({
     [gameState],
   );
 
-  const [lastPoints, setLastPoints] = useState(safeGameState.currency);
-  const [showMilestone, setShowMilestone] = useState(false);
-  const [milestoneMessage, setMilestoneMessage] = useState("");
   const [isClicking, setIsClicking] = useState(false);
   const [activeCategory, setActiveCategory] = useState<keyof typeof UPGRADE_CATEGORIES>("active");
   const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -92,25 +96,7 @@ export function GameView({
 
   // We'll use direct filtering in the render method instead of memoizing filteredUpgrades
 
-  // Styles for milestone notifications
-  const styles = {
-    milestoneContainer: {
-      position: "fixed" as const,
-      top: "50%",
-      left: "50%",
-      transform: "translate(-50%, -50%)",
-      backgroundColor: "rgba(0, 0, 0, 0.8)",
-      padding: "16px 24px",
-      borderRadius: 8,
-      zIndex: 1000,
-    },
-    milestoneText: {
-      color: "#fff",
-      fontSize: 24,
-      fontWeight: "bold",
-      textAlign: "center" as const,
-    },
-  };
+  // Removed HTML overlays in favor of Raycast-native UI only
 
   // Handle click effects
   const handleClick = () => {
@@ -136,18 +122,7 @@ export function GameView({
     }, 100);
   };
 
-  // Check for milestone achievements
-  useEffect(() => {
-    if (Math.floor(safeGameState.currency) > Math.floor(lastPoints)) {
-      const milestone = getMilestoneMessage(safeGameState.currency);
-      if (milestone) {
-        setMilestoneMessage(milestone);
-        setShowMilestone(true);
-        setTimeout(() => setShowMilestone(false), 2000);
-      }
-      setLastPoints(safeGameState.currency);
-    }
-  }, [safeGameState.currency, lastPoints]);
+  // Removed milestone HTML overlay effect
 
   // Removed unused utility functions
 
@@ -162,14 +137,6 @@ export function GameView({
 
   return (
     <>
-      {/* Combo counter and milestone notifications */}
-      {comboCount > 1 && <ComboCounter comboCount={comboCount} comboMultiplier={comboMultiplier} />}
-      {showMilestone && (
-        <div style={styles.milestoneContainer}>
-          <span style={styles.milestoneText}>{milestoneMessage}</span>
-        </div>
-      )}
-
       <List
         navigationTitle="Raycast Clicker"
         searchBarPlaceholder="Search upgrades..."
@@ -198,14 +165,40 @@ export function GameView({
               source: isClicking ? Icon.StarCircle : Icon.Star,
               tintColor: isClicking ? Color.Yellow : undefined,
             }}
+            accessories={[{ text: "⌘C", icon: Icon.Keyboard, tooltip: "Click to Earn" }]}
             actions={
               <ActionPanel>
-                <Action title="Click to Earn" onAction={handleClick} shortcut={{ modifiers: ["cmd"], key: "c" }} />
+                <Action
+                  title="Click to Earn"
+                  icon={Icon.Coins}
+                  onAction={handleClick}
+                  shortcut={{ modifiers: ["cmd"], key: "c" }}
+                />
+                <ActionPanel.Submenu title="Switch Category (⌘P)" icon={Icon.List}>
+                  <Action
+                    title="Active"
+                    icon={Icon.Star}
+                    shortcut={{ modifiers: ["cmd"], key: "1" }}
+                    onAction={() => setActiveCategory("active")}
+                  />
+                  <Action
+                    title="Idle"
+                    icon={Icon.Clock}
+                    shortcut={{ modifiers: ["cmd"], key: "2" }}
+                    onAction={() => setActiveCategory("idle")}
+                  />
+                  <Action
+                    title="Efficiency"
+                    icon={Icon.Gauge}
+                    shortcut={{ modifiers: ["cmd"], key: "3" }}
+                    onAction={() => setActiveCategory("efficiency")}
+                  />
+                </ActionPanel.Submenu>
                 <Action
                   title="Prestige Upgrades"
                   onAction={onShowPrestigeUpgrades}
                   icon={Icon.Stars}
-                  shortcut={{ modifiers: ["cmd"], key: "p" }}
+                  shortcut={{ modifiers: ["cmd"], key: "e" }}
                 />
                 <Action
                   title="Show Stats"
@@ -219,6 +212,22 @@ export function GameView({
                   icon={Icon.Bell}
                   shortcut={{ modifiers: ["cmd"], key: "t" }}
                 />
+                <Action
+                  title="Enable Background (Menu Bar)"
+                  icon={Icon.AppWindow}
+                  onAction={async () => {
+                    try {
+                      await launchCommand({ name: "menu-bar", type: LaunchType.UserInitiated });
+                    } catch (e) {
+                      await showToast({
+                        style: Toast.Style.Failure,
+                        title: "Failed to open Menu Bar",
+                        message: e instanceof Error ? e.message : String(e),
+                      });
+                    }
+                  }}
+                />
+                {/* Category actions moved below Click to Earn; removed Cycle Category (reserved shortcut) */}
               </ActionPanel>
             }
           />
@@ -240,6 +249,7 @@ export function GameView({
             actions={
               <ActionPanel>
                 <Action title="Open Prestige Menu" onAction={onShowPrestigeUpgrades} icon={Icon.Stars} />
+                <Action title="Prestige Now" onAction={onPrestige} icon={Icon.Star} />
                 <Action title="Show Stats" onAction={onShowStats} icon={Icon.BarChart} />
                 <Action
                   title="Reset Game"
@@ -274,10 +284,14 @@ export function GameView({
                 upgrade.milestoneLevels?.length > 0 ? Math.max(...upgrade.milestoneLevels) * 2 : Infinity;
               const isMaxed = level >= maxLevel;
               const canAfford = safeGameState.currency >= cost;
+              // Buy Max visibility: only when unlocked via prestige (Bulk Buyer Pro) or setting
+              const hasBuyMax = Boolean(
+                safeGameState.settings?.bulkBuyEnabled || (safeGameState.prestige?.upgrades?.["bulkBuyerPro"] || 0) > 0,
+              );
 
               // Estimate Buy Max count (greedy)
               let estBuy = 0;
-              if (!isMaxed) {
+              if (!isMaxed && hasBuyMax) {
                 const frugalLevel = safeGameState.prestige.upgrades["frugalShopper"] || 0;
                 let reduction = 1;
                 if (frugalLevel > 0) reduction = Math.max(0.01, 1 - 0.02 * frugalLevel);
@@ -338,28 +352,25 @@ export function GameView({
                         icon: Icon.Gauge,
                       } as const;
                     })(),
-                    ...(estBuy > 0
-                      ? ([
-                          {
-                            text: `Buy Max → ${estBuy}`,
-                            icon: Icon.ArrowDownCircle,
-                          },
-                        ] as const)
+                    // Keyboard hint for Buy
+                    ...(!isMaxed ? ([{ text: "⌘B", icon: Icon.Keyboard, tooltip: "Buy" }] as const) : ([] as const)),
+                    // Optional Buy Max preview
+                    ...(hasBuyMax && estBuy > 0
+                      ? ([{ text: `Buy Max → ${estBuy}`, icon: Icon.ArrowDownCircle }] as const)
                       : ([] as const)),
                   ]}
-                  // Removed split panel detail to use single-pane list
                   actions={
                     <ActionPanel>
                       {!isMaxed && (
                         <Action
-                          title={`Buy ${upgrade.name} (${formatNumber(cost)})`}
+                          title={`Buy ${upgrade.name}`}
                           icon={Icon.Plus}
                           onAction={() => onUpgrade(upgrade.id)}
-                          shortcut={{ modifiers: [], key: "enter" }}
+                          shortcut={{ modifiers: ["cmd"], key: "b" }}
                         />
                       )}
                       {/* Buy 10 removed per request */}
-                      {!isMaxed && (
+                      {hasBuyMax && !isMaxed && (
                         <Action
                           title={`Buy Max${estBuy > 0 ? ` (${estBuy})` : ""}`}
                           icon={Icon.ArrowDownCircle}
@@ -367,12 +378,26 @@ export function GameView({
                           shortcut={{ modifiers: ["cmd"], key: "m" }}
                         />
                       )}
-                      <Action
-                        title="Show All Upgrades"
-                        icon={Icon.List}
-                        onAction={() => {}}
-                        shortcut={{ modifiers: ["cmd"], key: "u" }}
-                      />
+                      <ActionPanel.Submenu title="Switch Category (⌘P)" icon={Icon.List}>
+                        <Action
+                          title="Active"
+                          icon={Icon.Star}
+                          shortcut={{ modifiers: ["cmd"], key: "1" }}
+                          onAction={() => setActiveCategory("active")}
+                        />
+                        <Action
+                          title="Idle"
+                          icon={Icon.Clock}
+                          shortcut={{ modifiers: ["cmd"], key: "2" }}
+                          onAction={() => setActiveCategory("idle")}
+                        />
+                        <Action
+                          title="Efficiency"
+                          icon={Icon.Gauge}
+                          shortcut={{ modifiers: ["cmd"], key: "3" }}
+                          onAction={() => setActiveCategory("efficiency")}
+                        />
+                      </ActionPanel.Submenu>
                       <Action title="Show Stats" onAction={onShowStats} icon={Icon.BarChart} />
                       <Action title="Prestige Upgrades" onAction={onShowPrestigeUpgrades} icon={Icon.Stars} />
                       <Action

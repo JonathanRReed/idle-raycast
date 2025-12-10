@@ -2,15 +2,16 @@
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "ray-clicker",
   "title": "Ray Clicker",
-  "description": "An idle clicker game for Raycast",
-  "icon": "extension-icon.png",
+  "description": "Idle clicker game for Raycast with upgrades, prestige, and fun events.",
+  "icon": "icon.png",
   "author": "JonathanRReed",
   "license": "MIT",
+  "categories": ["Fun"],
   "commands": [
     {
       "name": "index",
       "title": "Ray Clicker",
-      "subtitle": "Idle clicker game",
+      "subtitle": "Idle Clicker Game",
       "description": "Play the idle clicker game with upgrades",
       "mode": "view"
     }
